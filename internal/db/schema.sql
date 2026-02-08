@@ -22,4 +22,5 @@ CREATE TABLE IF NOT EXISTS chunks (
     UNIQUE(drop_id, chunk_index)
 );
 
-CREATE INDEX idx_drops_expires_at ON drops(expires_at);
+CREATE INDEX IF NOT EXISTS idx_drops_expires_at
+ON drops(expires_at);
