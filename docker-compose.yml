@@ -1,0 +1,51 @@
+services:
+  # Postgres: Our metadata database
+  db:
+    image: postgres:15-alpine
+    container_name: codedrop_db
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: codedrop
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  # Redis: High-speed counter/cache
+  redis:
+    image: redis:7-alpine
+    container_name: codedrop_redis
+    ports:
+      - "6379:6379"
+
+  # MinIO: A local replacement for AWS S3
+  minio:
+    image: minio/minio
+    container_name: codedrop_minio
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio_data:/data
+
+  # Create default bucket in MinIO automatically
+  createbuckets:
+    image: minio/mc
+    depends_on:
+      - minio
+    entrypoint: >
+      /bin/sh -c "
+      /usr/bin/mc alias set myminio http://minio:9000 minioadmin minioadmin;
+      /usr/bin/mc mb myminio/codedrop-bucket;
+      /usr/bin/mc anonymous set public myminio/codedrop-bucket;
+      exit 0;
+      "
+
+volumes:
+  postgres_data:
+  minio_data:
