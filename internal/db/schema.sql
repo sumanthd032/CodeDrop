@@ -1,4 +1,4 @@
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp"; -- allows us to generate UUIDs in Postgres
 
 CREATE TABLE IF NOT EXISTS drops (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -23,4 +23,4 @@ CREATE TABLE IF NOT EXISTS chunks (
 );
 
 CREATE INDEX IF NOT EXISTS idx_drops_expires_at
-ON drops(expires_at);
+ON drops(expires_at);    -- this makes it faster to find expired drops for cleanup
