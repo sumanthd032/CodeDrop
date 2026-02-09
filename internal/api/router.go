@@ -39,6 +39,8 @@ func (s *Server) routes() {
 	// Timeout: Hard limit of 60s per request to prevent hanging connections
 	s.Router.Use(middleware.Timeout(60 * time.Second))
 
+	// Routes
+	s.Router.Get("/health", s.handleHealthCheck())
 	
 	// API Group (v1)
 	s.Router.Route("/api/v1", func(r chi.Router) {
