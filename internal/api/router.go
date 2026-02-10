@@ -48,5 +48,9 @@ func (s *Server) routes() {
 		r.Get("/ping", func(w http.ResponseWriter, r *http.Request) {
 			w.Write([]byte("pong"))
 		})
+
+		// Upload Endpoints
+		r.Post("/drop", s.handleCreateDrop())
+		r.Post("/drop/{id}/chunk", s.handleUploadChunk())
 	})
 }
