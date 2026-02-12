@@ -52,5 +52,9 @@ func (s *Server) routes() {
 		// Upload Endpoints
 		r.Post("/drop", s.handleCreateDrop())
 		r.Post("/drop/{id}/chunk", s.handleUploadChunk())
+
+		// Download Endpoints
+		r.Get("/drop/{id}", s.handleGetDropMetadata())
+		r.Get("/drop/{id}/chunk/{chunkIndex}", s.handleDownloadChunk())
 	})
 }
