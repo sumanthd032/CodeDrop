@@ -28,3 +28,11 @@ type ChunkUploadResponse struct {
 // 2. Server responds with CreateDropResponse (drop ID and expiration time)
 // 3. CLI uploads file chunks to /api/v1/drops/{drop_id}/chunks (POST) with ChunkUploadResponse confirming each chunk
 
+// GetDropMetadataResponse is what the server sends back when the CLI requests metadata about a drop
+type GetDropMetadataResponse struct {
+	FileName       string `json:"file_name"`
+	FileSize       int64  `json:"file_size"`
+	EncryptionSalt string `json:"encryption_salt"`
+	ChunkCount     int    `json:"chunk_count"`
+}
+
