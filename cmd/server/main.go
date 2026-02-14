@@ -13,6 +13,7 @@ import (
 	"github.com/sumanthd032/codedrop/internal/cache"
 	"github.com/sumanthd032/codedrop/internal/db"
 	"github.com/sumanthd032/codedrop/internal/store"
+	"github.com/sumanthd032/codedrop/internal/worker"
 )
 
 func main() {
@@ -38,6 +39,14 @@ func main() {
 	}
 	log.Println("Successfully connected to Redis!")
 
+	// Initialize and Start Garbage Collector
+	// Create a cancellable context for the GC so we can shut it down cleanly
+	gcCtx, gcCancel := context.WithCancel(context.Background())
+	gc := worker.NewGarbageCollector(database, st)
+
+	// Start it in the background, checking every 10 seconds (useful for dev, might use 1m or 5m in prod)
+	go gc.Start(gcCtx, 10*time.Second)
+
 	// Initialize API Server
 	srv := api.NewServer(database, st, redisClient)
 
@@ -62,6 +71,9 @@ func main() {
 	<-quit // Block here until signal received
 
 	log.Println("Shutting down server...")
+
+	// Stop the Garbage Collector
+	gcCancel()
 
 	// Create a context with a 5-second timeout to allow active requests to finish
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
