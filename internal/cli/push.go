@@ -24,7 +24,11 @@ Example:
 	Args: cobra.ExactArgs(1), // We explicitly require exactly 1 argument (the file path)
 	Run: func(cmd *cobra.Command, args []string) {
 		filePath := args[0]
-		serverURL, _ := cmd.Flags().GetString("server")
+		serverURL, err := cmd.Flags().GetString("server")
+		if err != nil {
+			fmt.Fprintf(cmd.ErrOrStderr(), "Error reading --server flag: %v\n", err)
+			cmd.SilenceUsage = true
+		}
 
 		fmt.Printf("Preparing to push: %s\n", filePath)
 		fmt.Printf("Server: %s\n", serverURL)
@@ -33,6 +37,7 @@ Example:
 		
 		// In future, we will add the actual encryption and upload logic 
 		fmt.Println("Push command executed successfully.")
+		
 	},
 }
 
