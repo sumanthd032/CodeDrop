@@ -7,6 +7,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/sumanthd032/codedrop/internal/db"
+	"github.com/sumanthd032/codedrop/internal/cache"
 	"github.com/sumanthd032/codedrop/internal/store"
 )
 
@@ -14,14 +15,16 @@ import (
 type Server struct {
 	DB    *db.DB
 	Store *store.Store
+	Cache *cache.RedisClient
 	Router *chi.Mux
 }
 
 // NewServer initializes the router and dependencies
-func NewServer(db *db.DB, store *store.Store) *Server {
+func NewServer(db *db.DB, store *store.Store, cacheClient *cache.RedisClient) *Server {
 	s := &Server{
 		DB:    db,
 		Store: store,
+		Cache: cacheClient,
 		Router: chi.NewRouter(),
 	}
 
