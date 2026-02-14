@@ -17,14 +17,15 @@ func (s *Server) handleGetDropMetadata() http.HandlerFunc {
 
 		var resp GetDropMetadataResponse
 		var expiresAt time.Time
+		var maxDownloads int 
 
-		// 1. Fetch metadata from Postgres
+		// 1. Fetch metadata from Postgres (added max_downloads to the query)
 		query := `
-			SELECT file_name, file_size, encryption_salt, expires_at 
+			SELECT file_name, file_size, encryption_salt, expires_at, max_downloads 
 			FROM drops WHERE id = $1`
 		
 		err := s.DB.QueryRow(query, dropID).Scan(
-			&resp.FileName, &resp.FileSize, &resp.EncryptionSalt, &expiresAt,
+			&resp.FileName, &resp.FileSize, &resp.EncryptionSalt, &expiresAt, &maxDownloads,
 		)
 
 		if err != nil {
@@ -32,13 +33,24 @@ func (s *Server) handleGetDropMetadata() http.HandlerFunc {
 			return
 		}
 
-		// 2. Check Expiry
+		// 2. Check Time Expiry
 		if time.Now().After(expiresAt) {
 			http.Error(w, "Drop has expired", http.StatusGone)
 			return
 		}
 
-		// 3. Get chunk count (to know how many pieces to expect)
+		// 3. Atomic download count check using Redis
+		allowed, err := s.Cache.IncrementAndCheck(r.Context(), dropID, maxDownloads)
+		if err != nil {
+			http.Error(w, "Internal server error checking limits", http.StatusInternalServerError)
+			return
+		}
+		if !allowed {
+			http.Error(w, "Download limit reached", http.StatusGone)
+			return
+		}
+
+		// 4. Get chunk count
 		err = s.DB.QueryRow("SELECT COUNT(*) FROM chunks WHERE drop_id = $1", dropID).Scan(&resp.ChunkCount)
 		if err != nil {
 			http.Error(w, "Database error", http.StatusInternalServerError)
