@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/sumanthd032/codedrop/internal/api"
+	"github.com/sumanthd032/codedrop/internal/cache"
 	"github.com/sumanthd032/codedrop/internal/db"
 	"github.com/sumanthd032/codedrop/internal/store"
 )
@@ -30,8 +31,15 @@ func main() {
 		log.Fatalf("Could not connect to storage: %v", err)
 	}
 
+	// Initialize Redis Cache
+	redisClient, err := cache.NewRedisClient()
+	if err != nil {
+		log.Fatalf("Could not connect to Redis: %v", err)
+	}
+	log.Println("✅ Successfully connected to Redis!")
+
 	// Initialize API Server
-	srv := api.NewServer(database, st)
+	srv := api.NewServer(database, st, redisClient)
 
 	// Configure HTTP Server
 	httpServer := &http.Server{
