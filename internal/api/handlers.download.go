@@ -1,6 +1,8 @@
 package api
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -66,19 +68,38 @@ func (s *Server) handleGetDropMetadata() http.HandlerFunc {
 func (s *Server) handleDownloadChunk() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		dropID := chi.URLParam(r, "id")
-		chunkIndex := chi.URLParam(r, "chunkIndex") // We'll add this param to router
+		chunkIndex := chi.URLParam(r, "chunkIndex")
 
-		// 1. Construct S3 Key
-		key := fmt.Sprintf("drops/%s/%s", dropID, chunkIndex)
-
-		// 2. Fetch from S3
-		data, err := s.Store.DownloadChunk(key)
+		// 1. Look up the hash from Postgres
+		var chunkHash string
+		err := s.DB.QueryRow(`
+			SELECT chunk_hash FROM chunks 
+			WHERE drop_id = $1 AND chunk_index = $2`, 
+			dropID, chunkIndex).Scan(&chunkHash)
+			
 		if err != nil {
-			http.Error(w, "Chunk not found or storage error", http.StatusNotFound)
+			http.Error(w, "Chunk metadata not found", http.StatusNotFound)
 			return
 		}
 
-		// 3. Stream binary back
+		// 2. Construct CAS S3 Key
+		key := fmt.Sprintf("chunks/%s", chunkHash)
+
+		// 3. Fetch from S3
+		data, err := s.Store.DownloadChunk(key)
+		if err != nil {
+			http.Error(w, "Chunk data not found in storage", http.StatusNotFound)
+			return
+		}
+
+		// 4. Integrity Check: Verify the data hasn't been corrupted in S3!
+		downloadedHash := sha256.Sum256(data)
+		if hex.EncodeToString(downloadedHash[:]) != chunkHash {
+			// If S3 flipped a bit, we detect it instantly and refuse to serve bad data.
+			http.Error(w, "CRITICAL: Data integrity verification failed", http.StatusInternalServerError)
+			return
+		}
+
 		w.Header().Set("Content-Type", "application/octet-stream")
 		w.Write(data)
 	}
