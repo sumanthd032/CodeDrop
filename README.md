@@ -56,14 +56,16 @@ patches. Existing tools violate basic engineering hygiene:
 
 ------------------------------------------------------------------------
 
-## Getting Started
+## Getting Started (Local Development)
 
 ### Prerequisites
 
--   Go 1.21+
--   Docker Desktop
+* [Go 1.21+](https://go.dev/dl/)
+* [Docker Desktop](https://www.docker.com/products/docker-desktop/)
 
 ### 1. Start Infrastructure
+
+CodeDrop relies on Postgres, Redis, and MinIO (local S3). Start them using Docker Compose:
 
 ``` bash
 docker compose up -d
@@ -75,10 +77,14 @@ docker compose up -d
 go run cmd/server/main.go
 ```
 
+The server will automatically run database migrations and connect to Redis/MinIO on startup.
+
 ### 3. Build CLI
 
 ``` bash
 go build -o codedrop cmd/cli/main.go
+# Optional: Move to your PATH so you can use it anywhere
+# mv codedrop /usr/local/bin/
 ```
 
 ------------------------------------------------------------------------
@@ -86,19 +92,29 @@ go build -o codedrop cmd/cli/main.go
 ## Usage
 
 ### Push
+Encrypt and upload a file with strict lifecycle policies.
 
 ``` bash
 ./codedrop push secret_build.zip --expire 1h --max-views 2
 ```
 
 ### Pull
+Download, verify integrity, and decrypt locally. Note: Place the URL in quotes to prevent the shell from interpreting the # fragment.
 
 ``` bash
 ./codedrop pull "http://localhost:8080/drop/a1b2c3d4#k=base64key..."
 ```
 
 ### Stats
-
+View real-time observability data, including storage saved by the CAS deduplication engine.
 ``` bash
 ./codedrop stats
 ```
+
+## Security & Threat Model
+
+**Honest-but-Curious Server**: CodeDrop assumes the server infrastructure is compromised. Because of Client-Side Encryption, the server only hosts mathematical garbage.
+
+**URL Fragment Key Distribution**: The decryption key is appended to the URL as a fragment (#k=...). Browsers and HTTP clients never transmit fragments to the server. The key strictly remains on the sender and receiver's machines.
+
+**Convergent Encryption Paradox**: Standard E2EE breaks deduplication (CAS). CodeDrop solves this by deriving the encryption key and AES-GCM nonce from the SHA-256 hash of the local file. Identical files produce identical ciphertext, allowing the server to deduplicate without ever knowing the plaintext.
