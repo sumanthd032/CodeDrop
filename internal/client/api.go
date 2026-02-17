@@ -23,6 +23,14 @@ type CreateDropResponse struct {
 	ExpiresAt time.Time `json:"expires_at"`
 }
 
+// Add this struct near the top with the other models
+type GetDropMetadataResponse struct {
+	FileName       string `json:"file_name"`
+	FileSize       int64  `json:"file_size"`
+	EncryptionSalt string `json:"encryption_salt"`
+	ChunkCount     int    `json:"chunk_count"`
+}
+
 type APIClient struct {
 	BaseURL    string
 	HTTPClient *http.Client
@@ -84,4 +92,49 @@ func (c *APIClient) UploadChunk(dropID string, chunkIndex int, data []byte) erro
 	}
 
 	return nil
+}
+
+// GetDropMetadata fetches the file details before downloading
+func (c *APIClient) GetDropMetadata(dropID string) (*GetDropMetadataResponse, error) {
+	url := fmt.Sprintf("%s/api/v1/drop/%s", c.BaseURL, dropID)
+	
+	resp, err := c.HTTPClient.Get(url)
+	if err != nil {
+		return nil, fmt.Errorf("network error: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		msg, _ := io.ReadAll(resp.Body)
+		if resp.StatusCode == http.StatusGone {
+			return nil, fmt.Errorf("this drop has expired or reached its download limit")
+		}
+		return nil, fmt.Errorf("server error (%d): %s", resp.StatusCode, string(msg))
+	}
+
+	var metaResp GetDropMetadataResponse
+	if err := json.NewDecoder(resp.Body).Decode(&metaResp); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	return &metaResp, nil
+}
+
+// DownloadChunk retrieves a single encrypted binary chunk
+func (c *APIClient) DownloadChunk(dropID string, chunkIndex int) ([]byte, error) {
+	url := fmt.Sprintf("%s/api/v1/drop/%s/chunk/%d", c.BaseURL, dropID, chunkIndex)
+	
+	resp, err := c.HTTPClient.Get(url)
+	if err != nil {
+		return nil, fmt.Errorf("network error: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		msg, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("server error (%d): %s", resp.StatusCode, string(msg))
+	}
+
+	// Read the binary data
+	return io.ReadAll(resp.Body)
 }
