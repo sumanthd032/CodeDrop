@@ -1,6 +1,8 @@
 package api
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -62,48 +64,51 @@ func (s *Server) handleUploadChunk() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		dropID := chi.URLParam(r, "id")
 		
-		// 1. Read the chunk index from the header
-		// We use a custom header because the body is pure binary data
 		chunkIndex := r.Header.Get("X-Chunk-Index")
 		if chunkIndex == "" {
 			http.Error(w, "Missing X-Chunk-Index header", http.StatusBadRequest)
 			return
 		}
 
-		// 2. Read the body (the binary data)
-		// Limit reader protects us from someone sending a 10GB chunk
-		const MaxChunkSize = 5 * 1024 * 1024 // 5MB limit per chunk
+		const MaxChunkSize = 5 * 1024 * 1024
 		data, err := io.ReadAll(http.MaxBytesReader(w, r.Body, MaxChunkSize))
 		if err != nil {
 			http.Error(w, "Chunk too large or read error", http.StatusRequestEntityTooLarge)
 			return
 		}
 
-		// 3. Generate a unique key for S3
-		// Key format: drops/<drop_id>/<chunk_index>
-		s3Key := fmt.Sprintf("drops/%s/%s", dropID, chunkIndex)
+		// 1. Calculate the SHA-256 Hash of the chunk (CONTENT-ADDRESSED STORAGE)
+		hash := sha256.Sum256(data)
+		chunkHash := hex.EncodeToString(hash[:])
 
-		// 4. Upload to S3 (MinIO)
+		// 2. Generate CAS key for S3
+		s3Key := fmt.Sprintf("chunks/%s", chunkHash)
+
+		// 3. Upload to S3
+		// Because it's CAS, if the file already exists, overwriting it is harmless 
+		// (it's the exact same data). In a super-optimized system, we'd check if it exists first.
 		if err := s.Store.UploadChunk(s3Key, data); err != nil {
 			http.Error(w, "Storage failure: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
 
-		// 5. Record chunk metadata in Postgres
-		// We store the hash later for integrity, for now just track presence
+		// 4. Record chunk metadata in Postgres
+		// We now store the ACTUAL hash instead of "placeholder_hash"
 		_, err = s.DB.Exec(`
 			INSERT INTO chunks (drop_id, chunk_index, chunk_hash, size)
 			VALUES ($1, $2, $3, $4)
-			ON CONFLICT (drop_id, chunk_index) DO NOTHING`, // If the same chunk is re-uploaded, we ignore it (idempotent)
-			dropID, chunkIndex, "placeholder_hash", len(data))
+			ON CONFLICT (drop_id, chunk_index) DO NOTHING`,
+			dropID, chunkIndex, chunkHash, len(data))
 		
 		if err != nil {
-			// If DB fails, we should ideally delete the S3 object, but for now just error
 			http.Error(w, "Metadata failure: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
 
 		w.WriteHeader(http.StatusCreated)
-		json.NewEncoder(w).Encode(map[string]string{"status": "uploaded"})
+		json.NewEncoder(w).Encode(map[string]string{
+			"status": "uploaded",
+			"hash":   chunkHash,
+		})
 	}
 }
