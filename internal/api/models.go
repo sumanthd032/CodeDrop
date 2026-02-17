@@ -36,3 +36,10 @@ type GetDropMetadataResponse struct {
 	ChunkCount     int    `json:"chunk_count"`
 }
 
+// StatsResponse represents the current health and storage metrics of the system
+type StatsResponse struct {
+	ActiveDrops  int   `json:"active_drops"`
+	TotalChunks  int   `json:"total_chunks"`
+	StorageUsed  int64 `json:"storage_used_bytes"`
+	StorageSaved int64 `json:"storage_saved_bytes"`
+}

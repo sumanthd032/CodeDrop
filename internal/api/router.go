@@ -59,5 +59,8 @@ func (s *Server) routes() {
 		// Download Endpoints
 		r.Get("/drop/{id}", s.handleGetDropMetadata())
 		r.Get("/drop/{id}/chunk/{chunkIndex}", s.handleDownloadChunk())
+
+		// Stats Endpoint
+		r.Get("/stats", s.handleGetStats())
 	})
 }
