@@ -74,32 +74,49 @@ func (gc *GarbageCollector) sweep() {
 	}
 }
 
-// deleteDrop wipes a single drop from S3 and Postgres
+// deleteDrop wipes a single drop from S3 and Postgres safely using Reference Counting
 func (gc *GarbageCollector) deleteDrop(dropID string) {
-	// 1. Find how many chunks this drop has so we can delete them from S3
-	var chunkCount int
-	err := gc.DB.QueryRow("SELECT COUNT(*) FROM chunks WHERE drop_id = $1", dropID).Scan(&chunkCount)
+	// A. Find all chunk hashes associated with this drop
+	rows, err := gc.DB.Query("SELECT chunk_hash FROM chunks WHERE drop_id = $1", dropID)
 	if err != nil {
-		log.Printf("[GC Error] Failed to count chunks for drop %s: %v", dropID, err)
+		log.Printf("[GC Error] Failed to fetch chunks for drop %s: %v", dropID, err)
 		return
 	}
+	defer rows.Close()
 
-	// 2. Delete chunks from S3
-	for i := 0; i < chunkCount; i++ {
-		s3Key := fmt.Sprintf("drops/%s/%d", dropID, i)
-		if err := gc.Store.DeleteChunk(s3Key); err != nil {
-			log.Printf("[GC Error] Failed to delete chunk %s from S3: %v", s3Key, err)
-			// We continue even if one chunk fails, to try and clean up the rest
+	var hashes []string
+	for rows.Next() {
+		var hash string
+		if err := rows.Scan(&hash); err == nil {
+			hashes = append(hashes, hash)
 		}
 	}
 
-	// 3. Delete metadata from Postgres
-	// Because we used ON DELETE CASCADE in our schema, deleting the drop 
-	// will automatically delete all associated chunk records in the DB!
+	// B. Delete metadata from Postgres FIRST
+	// This removes this drop's "claim" on the chunks.
 	_, err = gc.DB.Exec("DELETE FROM drops WHERE id = $1", dropID)
 	if err != nil {
 		log.Printf("[GC Error] Failed to delete drop %s from DB: %v", dropID, err)
 		return
+	}
+
+	// C. Safely delete from S3 (Reference Counting)
+	for _, hash := range hashes {
+		// Check if any OTHER active drops are still using this exact chunk
+		var count int
+		err := gc.DB.QueryRow("SELECT COUNT(*) FROM chunks WHERE chunk_hash = $1", hash).Scan(&count)
+		
+		if err == nil && count == 0 {
+			// NO ONE else is using this chunk. It is safe to destroy physically.
+			s3Key := fmt.Sprintf("chunks/%s", hash)
+			if err := gc.Store.DeleteChunk(s3Key); err != nil {
+				log.Printf("[GC Error] Failed to delete orphaned chunk %s from S3: %v", s3Key, err)
+			} else {
+				log.Printf("GC reclaimed storage space for chunk: %s", hash[:8])
+			}
+		} else {
+			log.Printf("GC skipped S3 deletion for chunk %s (still in use by %d other drops)", hash[:8], count)
+		}
 	}
 
 	log.Printf("GC permanently destroyed drop: %s", dropID)
