@@ -53,7 +53,7 @@ var pullCmd = &cobra.Command{
 		}
 
 		// 3. Fetch Metadata
-		fmt.Println("🌐 Contacting server for metadata...")
+		fmt.Println("Contacting server for metadata...")
 		api := client.NewAPIClient(baseURL)
 		
 		meta, err := api.GetDropMetadata(dropID)
