@@ -36,6 +36,13 @@ type APIClient struct {
 	HTTPClient *http.Client
 }
 
+type StatsResponse struct {
+	ActiveDrops  int   `json:"active_drops"`
+	TotalChunks  int   `json:"total_chunks"`
+	StorageUsed  int64 `json:"storage_used_bytes"`
+	StorageSaved int64 `json:"storage_saved_bytes"`
+}
+
 func NewAPIClient(baseURL string) *APIClient {
 	return &APIClient{
 		BaseURL: baseURL,
@@ -137,4 +144,27 @@ func (c *APIClient) DownloadChunk(dropID string, chunkIndex int) ([]byte, error)
 
 	// Read the binary data
 	return io.ReadAll(resp.Body)
+}
+
+// GetStats fetches the system metrics
+func (c *APIClient) GetStats() (*StatsResponse, error) {
+	url := fmt.Sprintf("%s/api/v1/stats", c.BaseURL)
+	
+	resp, err := c.HTTPClient.Get(url)
+	if err != nil {
+		return nil, fmt.Errorf("network error: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		msg, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("server error (%d): %s", resp.StatusCode, string(msg))
+	}
+
+	var statsResp StatsResponse
+	if err := json.NewDecoder(resp.Body).Decode(&statsResp); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	return &statsResp, nil
 }
