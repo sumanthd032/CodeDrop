@@ -1,6 +1,8 @@
 package cli
 
 import (
+	"crypto/sha256"
+	"encoding/base64"
 	"fmt"
 	"io"
 	"os"
@@ -43,13 +45,24 @@ var pushCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
-		// 2. Generate Encryption Key
-		fmt.Println("Generating local encryption key...")
-		key, encodedKey, err := crypto.GenerateKey()
+		// 2. Generate Convergent Encryption Key (CAS Compatible)
+		fmt.Println("Generating convergent encryption key (CAS compatible)...")
+		
+		// We hash the entire file to create a deterministic 32-byte (256-bit) key
+		hasher := sha256.New()
+		fileForHash, err := os.Open(filePath)
 		if err != nil {
-			fmt.Printf("Error generating encryption key: %v\n", err)
+			fmt.Printf("Error opening file for hashing: %v\n", err)
 			os.Exit(1)
 		}
+		if _, err := io.Copy(hasher, fileForHash); err != nil {
+			fmt.Printf("Error hashing file: %v\n", err)
+			os.Exit(1)
+		}
+		fileForHash.Close()
+
+		key := hasher.Sum(nil) // This is exactly 32 bytes, perfect for AES-256
+		encodedKey := base64.URLEncoding.EncodeToString(key)
 
 		// 3. Initialize API Client and Create Drop
 		fmt.Println("Contacting CodeDrop Server...")
