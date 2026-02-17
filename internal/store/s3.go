@@ -23,7 +23,7 @@ func NewS3Store() (*Store, error) {
 	// In a real AWS environment, we wouldn't need to hardcode endpoints like this.
 	r2Resolver := aws.EndpointResolverWithOptionsFunc(func(service, region string, options ...interface{}) (aws.Endpoint, error) {
 		return aws.Endpoint{
-			URL:           "http://localhost:9000", // Point to local MinIO
+			URL:           "http://127.0.0.1:9000", // Point to local MinIO
 			SigningRegion: "us-east-1",            // MinIO defaults to this region
 		}, nil
 	})
