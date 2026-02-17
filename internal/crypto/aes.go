@@ -4,6 +4,7 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/base64"
 	"fmt"
 	"io"
@@ -36,6 +37,7 @@ func DecodeKey(encodedKey string) ([]byte, error) {
 }
 
 // Encrypt takes a 256-bit key and plaintext, and returns AES-GCM ciphertext.
+// UPDATED FOR CONVERGENT ENCRYPTION: Uses a deterministic nonce.
 func Encrypt(key, plaintext []byte) ([]byte, error) {
 	block, err := aes.NewCipher(key)
 	if err != nil {
@@ -47,16 +49,13 @@ func Encrypt(key, plaintext []byte) ([]byte, error) {
 		return nil, err
 	}
 
-	// GCM requires a unique "nonce" (number used once) for every encryption.
-	// Standard GCM nonce size is 12 bytes.
-	nonce := make([]byte, gcm.NonceSize())
-	if _, err = io.ReadFull(rand.Reader, nonce); err != nil {
-		return nil, err
-	}
+	// CONVERGENT ENCRYPTION: 
+	// Instead of a random nonce, we use the SHA-256 hash of the plaintext.
+	// This guarantees that identical plaintext always produces identical ciphertext.
+	hash := sha256.Sum256(plaintext)
+	nonce := hash[:gcm.NonceSize()] // Take the first 12 bytes of the hash for the nonce
 
 	// Seal encrypts and authenticates the plaintext.
-	// We append the ciphertext to the nonce so we can extract the nonce later during decryption.
-	// Format: [12 bytes Nonce][... Ciphertext ...]
 	ciphertext := gcm.Seal(nonce, nonce, plaintext, nil)
 	return ciphertext, nil
 }
