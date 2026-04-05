@@ -2,3 +2,8 @@ bin/
 .DS_Store
 .env
 vendor/
+codedrop
+server
+*.dec
+test.txt
+downloaded_test.txt

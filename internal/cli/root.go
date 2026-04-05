@@ -26,8 +26,9 @@ func Execute() {
 }
 
 func init() {
-	// Here we define your flags and configuration settings.
-	// Cobra supports persistent flags, which, if defined here,
-	// will be global for your application.
-	rootCmd.PersistentFlags().StringP("server", "s", "http://localhost:8080", "CodeDrop API server URL")
+	serverDefault := os.Getenv("CODEDROP_SERVER")
+	if serverDefault == "" {
+		serverDefault = "http://localhost:8080"
+	}
+	rootCmd.PersistentFlags().StringP("server", "s", serverDefault, "CodeDrop API server URL")
 }
