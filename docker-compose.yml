@@ -33,6 +33,30 @@ services:
     volumes:
       - minio_data:/data
 
+  # Local dev server (optional - you can also run `go run cmd/server/main.go` directly)
+  server:
+    build: .
+    container_name: codedrop_server
+    ports:
+      - "8080:8080"
+    environment:
+      - DB_HOST=db
+      - DB_PORT=5432
+      - DB_USER=user
+      - DB_PASSWORD=password
+      - DB_NAME=codedrop
+      - DB_SSLMODE=disable
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - S3_ENDPOINT=http://minio:9000
+      - S3_BUCKET=codedrop-bucket
+      - AWS_ACCESS_KEY_ID=minioadmin
+      - AWS_SECRET_ACCESS_KEY=minioadmin
+    depends_on:
+      - db
+      - redis
+      - createbuckets
+
   # Create default bucket in MinIO automatically
   createbuckets:
     image: minio/mc

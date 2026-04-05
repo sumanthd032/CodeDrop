@@ -18,12 +18,13 @@ type DB struct {
 func NewConnection() (*DB, error) {
 	// We get connection details from environment variables (12-Factor App methodology)
 	dsn := fmt.Sprintf(
-		"host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
+		"host=%s port=%s user=%s password=%s dbname=%s sslmode=%s",
 		getEnv("DB_HOST", "localhost"),
 		getEnv("DB_PORT", "5432"),
 		getEnv("DB_USER", "user"),
 		getEnv("DB_PASSWORD", "password"),
 		getEnv("DB_NAME", "codedrop"),
+		getEnv("DB_SSLMODE", "disable"),
 	)
 
 	db, err := sqlx.Connect("postgres", dsn)
