@@ -25,6 +25,11 @@ var pushCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		filePath := args[0]
 		serverURL, _ := cmd.Flags().GetString("server")
+		if serverURL == "" {
+			fmt.Println("Error: no server URL configured. Set the CODEDROP_SERVER environment variable or use --server flag.")
+			fmt.Println("Example: export CODEDROP_SERVER=https://your-api.example.com")
+			os.Exit(1)
+		}
 
 		// 1. Open the file
 		file, err := os.Open(filePath)

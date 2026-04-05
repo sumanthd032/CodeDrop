@@ -1,10 +1,9 @@
-name: Build CLI Binaries
+name: Build and Release CLI
 
-# This workflow triggers on every push to the main branch
-# and whenever we create a new Release tag (e.g., v1.0.0)
 on:
   push:
     branches: [ "main" ]
+    tags: [ "v*.*.*" ]
   pull_request:
     branches: [ "main" ]
 
@@ -12,9 +11,7 @@ jobs:
   build:
     name: Build for ${{ matrix.os }}-${{ matrix.arch }}
     runs-on: ubuntu-latest
-    
-    # The Matrix Strategy: This tells GitHub to run this job 6 times, 
-    # once for every combination of OS and Architecture below!
+
     strategy:
       matrix:
         os: [linux, windows, darwin]
@@ -27,26 +24,46 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v5
       with:
-        go-version: '1.25.6' 
+        go-version: '1.25.6'
 
     - name: Download Dependencies
       run: go mod download
 
     - name: Build CLI
-      # It sets the target OS and Arch, 
-      # and compiles the CLI binary into a folder called "build/"
       run: |
         mkdir -p build
-        GOOS=${{ matrix.os }} GOARCH=${{ matrix.arch }} go build -ldflags="-s -w" -o build/codedrop-${{ matrix.os }}-${{ matrix.arch }} cmd/cli/main.go
-      
+        GOOS=${{ matrix.os }} GOARCH=${{ matrix.arch }} go build -ldflags="-s -w" -o build/codedrop-${{ matrix.os }}-${{ matrix.arch }} ./cmd/cli/main.go
+
     - name: Rename Windows binary
-      # Windows requires the .exe extension
       if: matrix.os == 'windows'
       run: mv build/codedrop-${{ matrix.os }}-${{ matrix.arch }} build/codedrop-${{ matrix.os }}-${{ matrix.arch }}.exe
 
     - name: Upload Artifacts
-      # This step takes the compiled files and attaches them to the GitHub Action run as downloadable artifacts.
       uses: actions/upload-artifact@v4
       with:
         name: codedrop-${{ matrix.os }}-${{ matrix.arch }}
         path: build/codedrop-*
+
+  release:
+    name: Create GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: write
+
+    steps:
+    - name: Download all artifacts
+      uses: actions/download-artifact@v4
+      with:
+        path: artifacts/
+        merge-multiple: true
+
+    - name: List artifacts
+      run: ls -lh artifacts/
+
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v2
+      with:
+        files: artifacts/*
+        generate_release_notes: true

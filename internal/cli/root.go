@@ -27,8 +27,5 @@ func Execute() {
 
 func init() {
 	serverDefault := os.Getenv("CODEDROP_SERVER")
-	if serverDefault == "" {
-		serverDefault = "http://localhost:8080"
-	}
-	rootCmd.PersistentFlags().StringP("server", "s", serverDefault, "CodeDrop API server URL")
+	rootCmd.PersistentFlags().StringP("server", "s", serverDefault, "CodeDrop API server URL (or set CODEDROP_SERVER env var)")
 }

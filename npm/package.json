@@ -1,0 +1,28 @@
+{
+  "name": "codedrop",
+  "version": "0.1.0",
+  "description": "Secure, ephemeral file handoff CLI — push and pull files with client-side encryption",
+  "bin": {
+    "codedrop": "run.js"
+  },
+  "scripts": {
+    "postinstall": "node install.js"
+  },
+  "os": ["linux", "darwin", "win32"],
+  "cpu": ["x64", "arm64"],
+  "engines": {
+    "node": ">=16"
+  },
+  "keywords": ["codedrop", "file-transfer", "cli", "encryption", "secure"],
+  "author": "Sumanth D",
+  "license": "MIT",
+  "files": [
+    "install.js",
+    "run.js",
+    "bin/"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/sumanthd032/codedrop"
+  }
+}
