@@ -93,7 +93,6 @@ download(downloadURL, binPath, 5)
     }
     console.log(`codedrop installed to ${binPath}`);
     console.log('\nQuick start:');
-    console.log('  export CODEDROP_SERVER=https://your-api.example.com');
     console.log('  codedrop push <file>');
     console.log('  codedrop pull <url>');
   })
