@@ -1,6 +1,6 @@
 {
   "name": "codedrop",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Secure, ephemeral file handoff CLI — push and pull files with client-side encryption",
   "bin": {
     "codedrop": "run.js"
