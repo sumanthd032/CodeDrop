@@ -47,6 +47,53 @@ Developers constantly need to hand off build artifacts, logs, or quick patches. 
 | Counters | Redis (AWS ElastiCache) |
 | Storage | AWS S3 |
 
+```mermaid
+flowchart TD
+    subgraph Sender["Sender"]
+        S_File[File] -->|"SHA-256"| S_Key["Convergent AES-256 Key"]
+        S_File -->|"4MB chunks"| S_Enc["AES-256-GCM encrypt"]
+    end
+
+    subgraph API["API Server — Go + Chi"]
+        Create["POST /drop\ncreate metadata"]
+        Upload["POST /drop/:id/chunk\nhash + store"]
+        Meta["GET /drop/:id\ncheck expiry + limit"]
+        Fetch["GET /drop/:id/chunk/:i\nfetch + verify"]
+        Stats["GET /stats"]
+    end
+
+    subgraph Infra["AWS Infrastructure"]
+        PG[("PostgreSQL\ndrops · chunks")]
+        Redis[("Redis\nLua INCR atomic counter")]
+        S3[("S3\nchunks/&lt;sha256&gt; — CAS dedupe")]
+    end
+
+    GC["Garbage Collector\nsweeps every 10s"]
+
+    subgraph Receiver["Receiver"]
+        R_Dec["AES-256-GCM decrypt\nkey from URL #k= fragment"] --> R_File[File]
+    end
+
+    S_Enc -->|ciphertext chunks| Upload
+    S_Key -.->|"never leaves sender\nkey in URL fragment"| R_Dec
+
+    Create --> PG
+    Upload -->|"INSERT chunk_hash"| PG
+    Upload -->|"PUT chunks/hash"| S3
+
+    Meta -->|"SELECT + TTL check"| PG
+    Meta -->|"INCR + compare max_downloads"| Redis
+    Fetch -->|"GET + re-hash verify"| S3
+    Stats -->|"dedupe savings"| PG
+
+    Fetch -->|ciphertext chunks| R_Dec
+
+    GC -->|"DELETE expired rows"| PG
+    GC -->|"reference-counted delete"| S3
+```
+
+> The server only ever handles ciphertext and hashes. Encryption, decryption, and the key itself stay on the sender's and receiver's machines — the key travels solely in the URL fragment (`#k=...`), which HTTP clients never transmit to a server.
+
 ---
 
 ## Installation
